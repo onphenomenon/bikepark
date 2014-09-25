@@ -1,0 +1,222 @@
+<html>
+<head>
+  <meta charset=utf-8 />
+  <title>Bike Ram</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+
+  <!-- Load Leaflet from CDN-->
+  <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+  <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+
+  <!-- Load Esri Leaflet from CDN -->
+  <script src="http://cdn-geoweb.s3.amazonaws.com/esri-leaflet/0.0.1-beta.5/esri-leaflet.js"></script>
+
+  <style>
+    body {margin:0;padding:0;}
+#map {top:0;bottom:0;right:0;left:0;width:100%;height:80%;}
+  </style>
+</head>
+<body>
+
+<div id="map" >
+</div>
+<b><font color="green"><div id="message" align="center"></div></font></b>
+<div align="center">
+    <button id="find_parking" onclick="current()"> Home
+    <button id="find_parking" onclick="find_parking()"> Find Parking
+    <button id="checkin" onclick="checkin(-1)"> Check In
+    <button id="checkout" onclick="checkout()"> Check Out
+</div>
+<div align="center"><b> Report Availability: </b>
+    <button id="1" onclick="checkin(1)"> 1-2
+    <button id="2" onclick="checkin(3)"> 3-5
+    <button id="3" onclick="checkin(6)"> 6+
+</div>
+
+<script>
+var base_url = "http://10.17.135.167:4567/"
+    var map = L.map('map').setView([45.526, -122.667],13);
+
+L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+
+var popup = L.popup();
+
+var current_lng;
+var current_lat;
+
+function onMapClick(e) {
+    popup
+	.setLatLng(e.latlng)
+	.setContent('You are here!')
+	.openOn(map);
+    console.log(e);
+    current_lng = e.latlng.lng;
+    current_lat = e.latlng.lat;
+}
+
+var f;
+function onLocationFound(e) {
+    if(typeof e != 'undefined') f = e;
+    else e = f;
+    var radius = e.accuracy / 2;
+    
+    L.marker(e.latlng).addTo(map).bindPopup("You are within " + radius + " meters from this point").openPopup();
+    
+    L.circle(e.latlng, radius).addTo(map);
+    current_lng = e.latlng.lng;
+    current_lat = e.latlng.lat;
+    console.log("********MAP LOADED");
+}
+
+function onLocationError(e) {
+    alert(e.message);
+}
+
+function current(){
+    onLocationFound();
+}
+map.on('locationfound', onLocationFound);
+map.on('locationerror', onLocationError);
+map.locate({setView: true, maxZoom: 16});
+
+
+map.on('click', onMapClick);
+
+// console.log(arr.length)
+// console.log(arr[1]);
+// var marker = L.marker([51.5, -0.09]).addTo(map);
+// for(var i=0;i<arr.length;i++){
+//   console.log(arr[i].lat);
+//   L.marker(arr[i].lat,arr[i].lon).addTo(map);
+// }
+
+
+function get_xmlhttp()
+{
+    var xmlhttp; 
+    if(window.XMLHttpRequest) 
+    {
+   	xmlhttp = new XMLHttpRequest();
+    } 
+    else 
+    {
+   	xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    return xmlhttp;
+}
+
+var x = document.getElementById("demo");
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(showPosition);
+    } else {
+        x.innerHTML = "Geolocation is not supported by this browser.";
+    }
+}
+
+function showPosition(position) {
+    x.innerHTML = "Latitude: " + position.coords.latitude + 
+	"<br>Longitude: " + position.coords.longitude; 
+}
+
+function checkin(available){
+    flag = true;
+    if(available != -1){
+	set_msg("Thank you for checking in and updating availability");
+	flag = false;
+    }
+    var xmlhttp = get_xmlhttp();
+    var fetch_location = base_url+'checkin?user=101&x='+current_lat+'&y='+current_lng+'&available='+available;
+    xmlhttp.open("GET",fetch_location,true); xmlhttp.send();
+    xmlhttp.onreadystatechange=function()
+    {
+	if (xmlhttp.readyState==4)
+	{
+	    if (xmlhttp.status==200)
+	    {
+		if(flag) set_msg("You checked in here.");
+		data = xmlhttp.responseText;
+	    }
+	}
+    }
+}
+
+function checkout(){
+    var xmlhttp = get_xmlhttp();
+    var fetch_location = base_url+'checkout?user=101&x='+current_lat+'&y='+current_lng;
+    xmlhttp.open("GET",fetch_location,true); xmlhttp.send();
+    xmlhttp.onreadystatechange=function()
+    {
+	if (xmlhttp.readyState==4)
+	{
+	    if (xmlhttp.status==200)
+	    {
+		set_msg("You checked out from here.");
+		data = xmlhttp.responseText;
+	    }
+	}
+    }
+}
+
+function set_msg(str){
+		   document.getElementById("message").innerHTML = str;
+		   }
+
+function find_parking(){
+    var xmlhttp = get_xmlhttp();
+    var fetch_location = base_url+'availability?x='+current_lat+'&y='+current_lng;
+    xmlhttp.open("GET",fetch_location,true); xmlhttp.send();
+    xmlhttp.onreadystatechange=function()
+    {
+	if (xmlhttp.readyState==4)
+	{
+	    if (xmlhttp.status==200)
+	    {
+		data = xmlhttp.responseText;
+		//planes = JSON.parse(data);
+		planes = JSON.parse(data);
+		final_array = [];
+		for(var i = 1; i<= Object.size(planes) ; i++) {
+		    var arr = [planes[i].ava.toString(), parseFloat(planes[i].x), parseFloat(planes[i].y)];
+		    final_array.push(arr);
+		}
+		console.log(final_array);
+		// var planes = [
+		// 	["7C6B07",37.763789,-122.475693],
+		// 	["7C6B38",-41.30269,173.63696],
+		// 	["7C6CA1",-41.49413,173.5421],
+		// 	["7C6CA2",-40.98585,174.50659],
+		// 	["C81D9D",-40.93163,173.81726],
+		// 	["C82009",-41.5183,174.78081],
+		// 	["C82081",-41.42079,173.5783],
+		// 	["C820AB",-42.08414,173.96632],
+		// 	["C820B6",-41.51285,173.53274]
+		// ];
+
+		planes = final_array;
+		for (var i = 0; i < planes.length; i++) {
+		    console.log(planes[i]);
+		    //marker = new L.marker([planes[i][1],planes[i][2]]).addTo(map);
+		    marker = new L.marker([planes[i][1],planes[i][2]]).addTo(map).bindPopup("Places available: " + planes[i][0]).openPopup();
+		}
+		console.log(data);
+		var num = (final_array.length);
+		set_msg("We found "+ num  + " locations nearby.");
+		//a = JSON.parse(data);
+	    }
+	}
+    }
+}
+
+Object.size = function(obj) {
+    var size = 0, key;
+    for (key in obj) {
+        if (obj.hasOwnProperty(key)) size++;
+    }
+    return size;
+};
+</script>
+
+</body>
+    </html>
